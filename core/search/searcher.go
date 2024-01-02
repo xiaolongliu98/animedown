@@ -1,8 +1,8 @@
 package search
 
 import (
-	"animedown/group"
-	"animedown/sortid"
+	"animedown/core/group"
+	"animedown/core/sortid"
 	"fmt"
 	"strings"
 )

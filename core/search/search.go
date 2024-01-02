@@ -2,7 +2,6 @@ package search
 
 import (
 	"animedown/util"
-	"fmt"
 	"io"
 	"strings"
 )
@@ -28,37 +27,23 @@ var (
 	}
 )
 
-func TestSearch() {
-	// GET https://share.dmhy.org/topics/list?keyword=%E8%91%AC%E9%80%81
-	keyword := "葬送"
-
-	_, rowSlice, headIdxMap, err := RawSearch(keyword)
-	if err != nil {
-		panic(err)
+func AllFilterRowFilter(allRow []string, filters []string) []string {
+	var (
+		filterRow []string
+	)
+	for _, filter := range filters {
+		filterRow = append(filterRow, allRow[GetAllFilterIndex(filter)])
 	}
+	return filterRow
+}
 
-	//headFilters := []string{FilterPostDate, FilterCategory, FilterTitle, FilterSize, FilterMagnet}
-	headFilters := []string{FilterTitle, FilterSize, FilterMagnet}
-	for _, head := range headFilters {
-		fmt.Printf("%s\t", head)
-	}
-	fmt.Println()
-	for _, row := range rowSlice {
-		for _, head := range headFilters {
-			idx, ok := headIdxMap[head]
-			if !ok {
-				continue
-			}
-			fmt.Printf("%s\t", row[idx])
-
-			if head == FilterMagnet {
-				fmt.Println(strings.Contains(row[idx], "\n"))
-			}
+func GetAllFilterIndex(filter string) int {
+	for i, f := range AllFilters {
+		if f == filter {
+			return i
 		}
-		fmt.Println()
-
-		break
 	}
+	return -1
 }
 
 // RawSearch returns the raw search result

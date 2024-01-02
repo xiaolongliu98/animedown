@@ -20,9 +20,9 @@ func WithNoClearScreenForDefaultGuideFunc() StageOption {
 	}
 }
 
-func WithNoPrintDefaultUsageText() StageOption {
+func WithNoPrintDefaultGuideFuncUsageText() StageOption {
 	return func(stage *TerminalStage) {
-		stage.noPrintDefaultUsageText = true
+		stage.noPrintDefaultGuideFuncUsageText = true
 	}
 }
 
@@ -50,8 +50,14 @@ func WithNoEntryGuide() StageOption {
 	}
 }
 
-func WithNoPrintDefaultGuideText() StageOption {
+func WithNoPrintDefaultGuideFuncGuideText() StageOption {
 	return func(stage *TerminalStage) {
-		stage.noPrintDefaultGuideText = true
+		stage.noPrintDefaultGuideFuncGuideText = true
+	}
+}
+
+func WithNoPrintDefaultCMDUsage() StageOption {
+	return func(stage *TerminalStage) {
+		stage.noPrintDefaultCMDUsage = true
 	}
 }

@@ -1,14 +1,15 @@
 package search
 
 import (
-	"animedown/argparser"
+	"animedown/core/search"
 	"animedown/dispatcher/common"
 	"animedown/dispatcher/constants"
+	"animedown/dispatcher/search/add"
 	"animedown/dispatcher/search/download"
 	"animedown/dispatcher/search/next"
 	"animedown/dispatcher/search/prev"
-	"animedown/search"
-	"animedown/terminal"
+	"animedown/util/argparser"
+	"animedown/util/terminal"
 	"fmt"
 	"strings"
 )
@@ -59,13 +60,15 @@ func New() *terminal.TerminalStage {
 		terminal.WithInitFunc(initFunc),
 		terminal.WithExitFunc(exitFunc),
 		terminal.WithNoEntryGuide(),
-		terminal.WithNoPrintDefaultGuideText(),
+		terminal.WithNoPrintDefaultGuideFuncGuideText(),
+		terminal.WithNoPrintDefaultCMDUsage(),
 	)
 
 	err := stage.AddChild(
 		download.New(),
 		next.New(),
 		prev.New(),
+		add.New(),
 	)
 	if err != nil {
 		panic(err)

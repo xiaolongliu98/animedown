@@ -40,6 +40,7 @@ var (
 				left = `</span>`
 			)
 			s = s[strings.Index(s, left)+len(left):]
+			s = defaultExtractor(s)
 			// 去除结尾 "約?條評論"
 			const (
 				right1 = `約`
@@ -49,7 +50,7 @@ var (
 			if strings.HasSuffix(s, right2) && strings.Contains(s, right1) {
 				s = s[:strings.LastIndex(s, right1)]
 			}
-			return defaultExtractor(s)
+			return s
 		},
 	}
 )

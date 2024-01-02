@@ -1,9 +1,13 @@
 package main
 
 import (
+	"animedown/core/todolist"
+	"animedown/dispatcher/constants"
+	"animedown/dispatcher/global/setdir"
 	"animedown/dispatcher/search"
-	"animedown/terminal"
+	"animedown/dispatcher/todo"
 	"animedown/util"
+	"animedown/util/terminal"
 	"fmt"
 )
 
@@ -13,9 +17,17 @@ func main() {
  - Refer: https://share.dmhy.org/
 `
 
-	t := terminal.NewTerminal(intro)
+	t := terminal.NewTerminal(intro, func(this *terminal.TerminalStage, args []string) (terminal.ExitCode, error) {
+		// init to-do list
+		list := todolist.New()
+		this.Set(constants.TodoListKey, list)
+		return terminal.ExitCodeOK, nil
+	})
 
 	_ = t.AddStage(search.New())
+	_ = t.AddStage(todo.New())
+
+	t.AddGlobalStage(setdir.Usage, setdir.New)
 
 	if err := t.Run(); err != nil {
 		// Fatal error

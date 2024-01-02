@@ -1,7 +1,7 @@
 package downloader
 
 import (
-	"animedown/ratecalc"
+	"animedown/util/ratecalc"
 	"context"
 	"fmt"
 	alog "github.com/anacrolix/log"

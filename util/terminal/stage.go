@@ -19,11 +19,6 @@ type (
 )
 
 const (
-	DefaultCMDQuit = "q"    // quit current stage.
-	DefaultCMDHelp = "help" // print help text.
-	DefaultCMDRoot = "rr"   // return to root stage.
-	DefaultCMDExit = "exit" // exit program.
-
 	ExitCodeFatal        ExitCode = -2 // fatal error, will exit program.
 	ExitCodeError        ExitCode = -1 // error, will return to parent stage, and print error.
 	ExitCodeOK           ExitCode = 0  // ok, will return to parent stage.
@@ -31,6 +26,8 @@ const (
 	ExitCodeReturnToRoot ExitCode = 2  // return to root, will return to root stage.
 	ExitCodeRecallSelf   ExitCode = 3  // return to parent's parent stage, and then recall parent stage with new args.
 	ExitCodeRecallChild  ExitCode = 4  // return to parent stage, and then recall current stage with new args.
+	ExitCodeExit         ExitCode = 5  // exit program, will exit program.
+	ExitCodeCurrentQuit  ExitCode = 6  // stage quit signal.
 
 	RecallSelfArgsKey = "recallSelfArgs"
 )
@@ -47,7 +44,8 @@ type TerminalStage struct {
 	// and it will not have any children.
 	// When user input this stage's usage, it will call InitFunc at once,
 	// and then return to its parent stage.
-	IsLeaf bool
+	IsLeaf   bool
+	isGlobal bool
 	// InitFunc will be called when user input this stage's usage.
 	// You can use this func to do something, likes: print guide text, do your task, etc.
 	InitFunc
@@ -55,11 +53,12 @@ type TerminalStage struct {
 	ExitFunc
 	GuideText string
 
-	noEntryGuide            bool
-	noClearScreen           bool
-	noPrintDefaultGuideText bool
-	noPrintDefaultUsageText bool
-	data                    map[string]interface{}
+	noEntryGuide                     bool
+	noClearScreen                    bool
+	noPrintDefaultGuideFuncGuideText bool
+	noPrintDefaultGuideFuncUsageText bool
+	noPrintDefaultCMDUsage           bool
+	data                             map[string]interface{}
 }
 
 // NewTerminalStage will create a new TerminalStage.
@@ -79,7 +78,6 @@ func NewTerminalStage(usage string, usageExplain string, format string, opts ...
 	if t.GuideFunc == nil {
 		t.GuideFunc = defaultGuideFunc
 	}
-
 	return t
 }
 
@@ -93,12 +91,8 @@ func (c *TerminalStage) AddChild(child ...*TerminalStage) error {
 }
 
 func (c *TerminalStage) addChild(child *TerminalStage) error {
-
 	if c.IsLeaf {
 		return fmt.Errorf("cannot add child to a leaf stage")
-	}
-	if c.Usage == DefaultCMDQuit {
-		return fmt.Errorf("'q' is a default command, cannot add child to it")
 	}
 
 	c.Children[child.Usage] = child
@@ -174,11 +168,6 @@ func (c *TerminalStage) workloop() (ExitCode, error) {
 		line = strings.TrimSpace(line)
 		line = util.StandardizeCMDString(line)
 
-		// TODO as a default command, 'q' should be a const
-		if line == DefaultCMDQuit {
-			return ExitCodeOK, nil
-		}
-		// TODO as a default command, empty line should be a const
 		if line == "" {
 			continue
 		}
@@ -201,23 +190,29 @@ func (c *TerminalStage) workloop() (ExitCode, error) {
 				continue
 
 			case ExitCodeQuitParent:
-				return ExitCodeOK, err
+				return ExitCodeCurrentQuit, err
+			case ExitCodeCurrentQuit:
+				c.printGuideTextForChildQuit(child)
 
 			case ExitCodeOK:
-				if !child.IsLeaf {
-					runGuideFuncSafely(c)
-				}
+				c.printGuideTextForChildQuit(child)
 
 			case ExitCodeReturnToRoot:
 				if !c.IsRoot() {
 					return ExitCodeReturnToRoot, err
 				}
+				// is root
+				c.printGuideTextForChildQuit(child)
+
 			case ExitCodeRecallSelf:
 				return ExitCodeRecallChild, err
 			case ExitCodeRecallChild:
 				// reset args
 				args = child.GetDelete(RecallSelfArgsKey).([]string)
 				goto TagRecall
+
+			case ExitCodeExit:
+				return ExitCodeExit, err
 
 			default:
 				panic("unknown exit code")
@@ -229,7 +224,23 @@ func (c *TerminalStage) workloop() (ExitCode, error) {
 	}
 }
 
-func (c *TerminalStage) PrintChildrenUsage() {
+func (c *TerminalStage) printGuideTextForChildQuit(child *TerminalStage) {
+	if child.IsLeaf {
+		return
+	}
+	if !c.noClearScreen {
+		util.ClearScreen()
+	}
+	// print guide text
+	runGuideFuncSafely(c)
+}
+
+func (c *TerminalStage) PrintChildrenUsage(noLimit ...bool) {
+	limit := true
+	if len(noLimit) > 0 && noLimit[0] {
+		limit = false
+	}
+
 	var (
 		subs   []*TerminalStage
 		leaves []*TerminalStage
@@ -244,16 +255,41 @@ func (c *TerminalStage) PrintChildrenUsage() {
 
 	// Firstly, print sub children's usage.
 	if len(subs) > 0 {
-		fmt.Println("Sub Children Usage:")
-		for i, child := range subs {
-			fmt.Printf("[%d] %s \t %s\n", i, child.Format, child.UsageExplain)
+		fmt.Println(" - Sub-Terminals:")
+		for _, child := range subs {
+			fmt.Print("   ")
+			fmt.Printf("[-] %s \t %s\n", child.Format, child.UsageExplain)
 		}
 	}
 	// Secondly, print leaf children's usage.
 	if len(leaves) > 0 {
-		fmt.Println("Leaf Children Usage:")
-		for i, child := range leaves {
-			fmt.Printf("[%d] %s \t %s\n", i, child.Format, child.UsageExplain)
+		fmt.Println()
+		fmt.Println(" - Commands:")
+		countNonDefaultStage := 0
+		for _, child := range leaves {
+			if !child.IsGlobalStage() {
+				fmt.Print("   ")
+				fmt.Printf("[*] %s \t %s\n", child.Format, child.UsageExplain)
+				countNonDefaultStage++
+			}
+		}
+
+		if len(leaves)-countNonDefaultStage == 0 {
+			return
+		}
+
+		if countNonDefaultStage > 0 {
+			fmt.Println()
+		}
+
+		for _, child := range leaves {
+			if child.IsGlobalStage() {
+				if limit && c.noPrintDefaultCMDUsage && child.IsDefaultStage() {
+					continue
+				}
+				fmt.Print("   ")
+				fmt.Printf("[*] %s \t %s\n", child.Format, child.UsageExplain)
+			}
 		}
 	}
 }
@@ -294,6 +330,17 @@ func (c *TerminalStage) IsRoot() bool {
 	return c.Parent == nil
 }
 
+// IsGlobalStage will return true if this stage is a global stage.
+func (c *TerminalStage) IsGlobalStage() bool {
+	return c.isGlobal
+}
+
+// IsDefaultStage will return true if this stage is a default stage.
+func (c *TerminalStage) IsDefaultStage() bool {
+	_, ok := DefaultStages[c.Usage]
+	return ok
+}
+
 func runInitFuncSafely(stage *TerminalStage, args []string) (ExitCode, error) {
 	if stage.InitFunc != nil {
 		return stage.InitFunc(stage, args)
@@ -308,10 +355,10 @@ func runGuideFuncSafely(stage *TerminalStage) {
 }
 
 func defaultGuideFunc(this *TerminalStage) {
-	if this.GuideText != "" && !this.noPrintDefaultGuideText {
+	if this.GuideText != "" && !this.noPrintDefaultGuideFuncGuideText {
 		fmt.Println(this.GuideText)
 	}
-	if !this.noPrintDefaultUsageText {
+	if !this.noPrintDefaultGuideFuncUsageText {
 		this.PrintChildrenUsage()
 	}
 }

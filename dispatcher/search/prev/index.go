@@ -1,11 +1,11 @@
 package prev
 
 import (
-	"animedown/argparser"
+	"animedown/core/search"
 	"animedown/dispatcher/common"
 	"animedown/dispatcher/constants"
-	"animedown/search"
-	"animedown/terminal"
+	"animedown/util/argparser"
+	terminal2 "animedown/util/terminal"
 )
 
 const (
@@ -14,13 +14,13 @@ const (
 	FormatText  = `pp`
 )
 
-func initFunc(this *terminal.TerminalStage, args []string) (terminal.ExitCode, error) {
+func initFunc(this *terminal2.TerminalStage, args []string) (terminal2.ExitCode, error) {
 	ctx, err := argparser.Parse(args, false)
 	if err != nil {
-		return terminal.ExitCodeError, err
+		return terminal2.ExitCodeError, err
 	}
 	if err := ctx.Check(0); err != nil {
-		return terminal.ExitCodeError, err
+		return terminal2.ExitCodeError, err
 	}
 
 	// get searcher
@@ -28,20 +28,20 @@ func initFunc(this *terminal.TerminalStage, args []string) (terminal.ExitCode, e
 	// next page
 	err = s.PrevPage()
 	if err != nil {
-		return terminal.ExitCodeError, err
+		return terminal2.ExitCodeError, err
 	}
 	// show
 	common.ShowSearchResult(s)
 	// show usage
 	this.Parent.RunDefaultGuideFunc()
 
-	return terminal.ExitCodeOK, nil
+	return terminal2.ExitCodeOK, nil
 }
 
-func New() *terminal.TerminalStage {
-	stage := terminal.NewTerminalStage(Usage, ExplainText, FormatText,
-		terminal.WithInitFunc(initFunc),
-		terminal.WithLeafStage(),
+func New() *terminal2.TerminalStage {
+	stage := terminal2.NewTerminalStage(Usage, ExplainText, FormatText,
+		terminal2.WithInitFunc(initFunc),
+		terminal2.WithLeafStage(),
 	)
 
 	return stage

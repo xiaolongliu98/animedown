@@ -2,11 +2,13 @@ package terminal
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 )
 
 type Terminal struct {
-	RootStage *TerminalStage
+	rootStage   *TerminalStage
+	globalStage map[string]func() *TerminalStage
 }
 
 func NewTerminal(guideText string, initFunc ...InitFunc) *Terminal {
@@ -14,13 +16,14 @@ func NewTerminal(guideText string, initFunc ...InitFunc) *Terminal {
 		initFunc = append(initFunc, nil)
 	}
 	return &Terminal{
-		RootStage: NewTerminalStage(
+		rootStage: NewTerminalStage(
 			"",
 			"",
 			"",
 			WithInitFunc(initFunc[0]),
 			WithGuideText(guideText),
 		),
+		globalStage: maps.Clone(DefaultStageFactory),
 	}
 }
 
@@ -34,7 +37,7 @@ func (t *Terminal) AddStage(stage *TerminalStage, usagePath ...string) error {
 	path = reviseUsagePath(path)[1:] // remove the first "/"
 	usages := strings.Split(path, "/")
 
-	parent := t.RootStage
+	parent := t.rootStage
 	for _, usage := range usages[1:] {
 		if child, ok := parent.Children[usage]; ok {
 			parent = child
@@ -46,9 +49,40 @@ func (t *Terminal) AddStage(stage *TerminalStage, usagePath ...string) error {
 }
 
 func (t *Terminal) Run() error {
-	_, err := t.RootStage.Run(nil)
+	if err := t.applyGlobalStage(); err != nil {
+		return err
+	}
+	_, err := t.rootStage.Run(nil)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// AddGlobalStage will add a global stage to terminal.
+func (t *Terminal) AddGlobalStage(usage string, stageGenerator func() *TerminalStage) {
+	t.globalStage[usage] = stageGenerator
+}
+
+func (t *Terminal) applyGlobalStage() error {
+	q := []*TerminalStage{t.rootStage}
+	for len(q) > 0 {
+		cur := q[0]
+		q = q[1:]
+
+		for _, child := range cur.Children {
+			if !child.IsLeaf {
+				q = append(q, child)
+			}
+		}
+
+		for _, f := range t.globalStage {
+			stage := f()
+			stage.isGlobal = true
+			if err := cur.AddChild(stage); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

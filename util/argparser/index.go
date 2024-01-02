@@ -20,7 +20,14 @@ func (a *ArgContext) Check(minNumArgs int, mustFlags ...string) error {
 	return nil
 }
 
-func Parse(args []string, hasCommand bool) (*ArgContext, error) {
+func Parse(args []string, hasCommand bool, flags ...map[string]bool) (*ArgContext, error) {
+	flagMap := make(map[string]bool)
+	for _, flag := range flags {
+		for k, v := range flag {
+			flagMap[k] = v
+		}
+	}
+
 	if hasCommand {
 		args = args[1:]
 	}
@@ -33,13 +40,22 @@ func Parse(args []string, hasCommand bool) (*ArgContext, error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg[0] == '-' {
+			arg = arg[1:]
 			// flag
 			// check valid
-			if len(args) <= i+1 || args[i+1][0] == '-' {
-				return nil, fmt.Errorf("invalid flag %s, value unset", arg)
+			if _, ok := flagMap[arg]; !ok {
+				return nil, fmt.Errorf("invalid flag %s", arg)
 			}
-			ctx.Flags[arg] = args[i+1]
-			i++
+			// check value
+			if flagMap[arg] {
+				if i+1 >= len(args) {
+					return nil, fmt.Errorf("invalid flag %s, need value", arg)
+				}
+				ctx.Flags[arg] = args[i+1]
+				i++
+			} else {
+				ctx.Flags[arg] = ""
+			}
 
 		} else {
 			// arg
