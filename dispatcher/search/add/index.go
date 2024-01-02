@@ -12,10 +12,15 @@ import (
 const (
 	Usage       = "add"
 	ExplainText = `add anime to temporary TODO list.`
-	FormatText  = `add <index/row>`
+	FormatText  = `add <index1> <index2> ...`
 )
 
 func initFunc(this *terminal.TerminalStage, args []string) (terminal.ExitCode, error) {
+	// get searcher
+	s := this.Get(constants.SearcherKey).(*search.Searcher)
+	// get TodoList
+	list := this.Get(constants.TodoListKey).(*todolist.TodoList)
+
 	ctx, err := argparser.Parse(args, false)
 	if err != nil {
 		return terminal.ExitCodeError, err
@@ -24,20 +29,17 @@ func initFunc(this *terminal.TerminalStage, args []string) (terminal.ExitCode, e
 		return terminal.ExitCodeError, err
 	}
 
-	index, err := strconv.Atoi(ctx.Args[0])
-	if err != nil {
-		return terminal.ExitCodeError, err
+	for _, arg := range ctx.Args {
+		index, err := strconv.Atoi(arg)
+		if err != nil {
+			return terminal.ExitCodeError, err
+		}
+		// add
+		err = list.Add(s.GetRowSlice()[index])
+		if err != nil {
+			return terminal.ExitCodeError, err
+		}
 	}
-	// get searcher
-	s := this.Get(constants.SearcherKey).(*search.Searcher)
-	// get TodoList
-	list := this.Get(constants.TodoListKey).(*todolist.TodoList)
-	// add
-	err = list.Add(s.GetRowSlice()[index])
-	if err != nil {
-		return terminal.ExitCodeError, err
-	}
-
 	return terminal.ExitCodeOK, nil
 }
 

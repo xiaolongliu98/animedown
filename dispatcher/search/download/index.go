@@ -5,48 +5,56 @@ import (
 	"animedown/dispatcher/common"
 	"animedown/dispatcher/constants"
 	"animedown/util/argparser"
-	terminal2 "animedown/util/terminal"
+	"animedown/util/terminal"
+	"fmt"
 	"strconv"
+	"strings"
 )
 
 const (
 	Usage       = "d"
 	ExplainText = `download anime by index/row, default dir is current.`
-	FormatText  = `d <index/row> [dir]`
+	FormatText  = `d <index1> <index2> ... [-d:dir]`
 )
 
-func initFunc(this *terminal2.TerminalStage, args []string) (terminal2.ExitCode, error) {
-	ctx, err := argparser.Parse(args, false)
+func initFunc(this *terminal.TerminalStage, args []string) (terminal.ExitCode, error) {
+	searcher := this.Get(constants.SearcherKey).(*search.Searcher)
+
+	ctx, err := argparser.Parse(args, false, map[string]bool{"d": true})
 	if err != nil {
-		return terminal2.ExitCodeError, err
+		return terminal.ExitCodeError, err
 	}
 	if err := ctx.Check(1); err != nil {
-		return terminal2.ExitCodeError, err
+		return terminal.ExitCodeError, err
 	}
 
 	dir, _ := this.Get(constants.DirKey).(string) // default dir is "", current dir
-	if len(ctx.Args) >= 2 {
-		dir = ctx.Args[1]
+	if targetDir, ok := ctx.Flags["d"]; ok {
+		dir = targetDir
 	}
 
-	index, err := strconv.Atoi(ctx.Args[0])
-	if err != nil {
-		return terminal2.ExitCodeError, err
+	for _, arg := range ctx.Args {
+		index, err := strconv.Atoi(arg)
+		if err != nil {
+			return terminal.ExitCodeError, err
+		}
+		// get magnet from searcher
+		magnet := searcher.GetMagnetLink(index)
+		if err = common.Download(magnet, dir); err != nil {
+			if strings.Contains(err.Error(), "download cancelled") {
+				return terminal.ExitCodeError, err
+			}
+			fmt.Println(err)
+		}
 	}
-	// get magnet from search result
-	s := this.Get(constants.SearcherKey).(*search.Searcher)
-	magnet := s.GetMagnetLink(index)
-	err = common.Download(magnet, dir)
-	if err != nil {
-		return terminal2.ExitCodeError, err
-	}
-	return terminal2.ExitCodeOK, nil
+
+	return terminal.ExitCodeOK, nil
 }
 
-func New() *terminal2.TerminalStage {
-	stage := terminal2.NewTerminalStage(Usage, ExplainText, FormatText,
-		terminal2.WithInitFunc(initFunc),
-		terminal2.WithLeafStage(),
+func New() *terminal.TerminalStage {
+	stage := terminal.NewTerminalStage(Usage, ExplainText, FormatText,
+		terminal.WithInitFunc(initFunc),
+		terminal.WithLeafStage(),
 	)
 
 	return stage

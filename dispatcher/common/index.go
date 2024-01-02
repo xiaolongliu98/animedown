@@ -86,10 +86,12 @@ func Download(magnet, dir string) error {
 	doneCh := make(chan struct{}, 1)
 
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
+	cancelled := false
 	go func() {
 		select {
 		case <-signalCh:
 			cancel()
+			cancelled = true
 		case <-doneCh:
 			return
 		}
@@ -105,5 +107,8 @@ func Download(magnet, dir string) error {
 	})
 	doneCh <- struct{}{}
 
+	if cancelled {
+		return fmt.Errorf("download cancelled")
+	}
 	return err
 }
