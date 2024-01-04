@@ -66,7 +66,14 @@ func DownloadBlocked(cfg *DownloadConfig) error {
 	cfg.Obs(StagePrepare, 0, 0, 0, 0, "", 0)
 	defer dropTorrentSafely(tor)
 	tor.AllowDataDownload()
-	<-tor.GotInfo()
+
+	select {
+	case <-tor.GotInfo():
+	case <-cfg.Ctx.Done():
+		cfg.Obs(StageCancel, 0, 0, 0, 0, "", 0)
+		return nil
+	}
+
 	totalBytes := tor.Length()
 	//totalPieces := tor.NumPieces()
 	//fmt.Println("File Name:", tor.Name())
